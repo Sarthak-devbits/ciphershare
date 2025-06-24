@@ -1,6 +1,9 @@
 import React, { useCallback, useState } from "react";
 import { Upload, X, Lock, Copy, Download, Check } from "lucide-react";
+import { addFile } from "@/services/webApis/webApis";
+
 type FileStatus = "idle" | "encrypting" | "uploading" | "complete" | "error";
+
 export function EncryptPage() {
   const [file, setFile] = useState<File | null>(null);
   const [password, setPassword] = useState("");
@@ -20,6 +23,7 @@ export function EncryptPage() {
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
   }, []);
+
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
@@ -34,6 +38,45 @@ export function EncryptPage() {
     setProgress(0);
     setShareLink("");
   }, []);
+
+  const handleAddFile = async ({
+    encryptedFile,
+    iv,
+    keyIv,
+    encryptedKey,
+    fileName,
+    salt,
+    fileSize,
+  }: {
+    encryptedFile: Blob;
+    iv: Uint8Array<ArrayBuffer>;
+    keyIv: Uint8Array<ArrayBuffer>;
+    encryptedKey: ArrayBuffer;
+    fileName: string;
+    salt: Uint8Array<ArrayBuffer>;
+    fileSize: number;
+  }) => {
+    try {
+      alert("reached");
+      const userId = 1;
+      const formData = new FormData();
+      formData.append("file", encryptedFile, fileName);
+      formData.append("userId", userId.toString());
+      formData.append("iv", btoa(String.fromCharCode(...iv)));
+      formData.append("keyIv", btoa(String.fromCharCode(...keyIv)));
+      formData.append("salt", btoa(String.fromCharCode(...salt)));
+      formData.append("fileSize", fileSize.toString());
+      formData.append(
+        "encryptedKey",
+        btoa(String.fromCharCode(...new Uint8Array(encryptedKey)))
+      );
+      const response = await addFile(formData);
+      console.log("✅ File uploaded:", response);
+    } catch (error) {
+      console.error("❌ Failed to upload file:", error);
+    }
+  };
+
   const handleEncrypt = useCallback(async () => {
     if (!file) return;
     setStatus("encrypting");
@@ -48,6 +91,10 @@ export function EncryptPage() {
       true,
       ["encrypt", "decrypt"]
     );
+    const fileSize = file.size;
+
+    console.log(fileSize);
+    const fileName = file.name;
     const fileBuffer = await file.arrayBuffer();
     setProgress(25);
 
@@ -56,6 +103,8 @@ export function EncryptPage() {
       aesKey,
       fileBuffer
     );
+
+    const encryptedBlob = new Blob([encryptedFile]);
 
     const rawAesKey = await crypto.subtle.exportKey("raw", aesKey);
     let encryptedKey, keyIv, salt;
@@ -85,13 +134,22 @@ export function EncryptPage() {
       );
 
       keyIv = crypto.getRandomValues(new Uint8Array(12));
-      console.log(keyIv);
 
       encryptedKey = await crypto.subtle.encrypt(
         { name: "AES-GCM", iv: keyIv },
         derivedKey,
         rawAesKey
       );
+
+      await handleAddFile({
+        encryptedFile: encryptedBlob,
+        iv: iv,
+        keyIv: keyIv,
+        encryptedKey: encryptedKey,
+        fileName,
+        salt: salt,
+        fileSize,
+      });
     }
   }, [file]);
 
