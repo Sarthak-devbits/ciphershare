@@ -92,9 +92,8 @@ export function EncryptPage() {
       ["encrypt", "decrypt"]
     );
     const fileSize = file.size;
-
-    console.log(fileSize);
     const fileName = file.name;
+
     const fileBuffer = await file.arrayBuffer();
     setProgress(25);
 

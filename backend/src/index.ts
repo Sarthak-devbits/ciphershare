@@ -4,6 +4,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import multer from "multer";
 import { UploadApiResponse } from "cloudinary";
+import { prisma } from "./lib/prisma";
 require("dotenv").config();
 
 const { v4: uuidv4 } = require("uuid");
@@ -64,6 +65,7 @@ app.post(
         res.status(500).json({ error: "Upload failed" });
         return;
       }
+
       const addFile = await prisma?.file.create({
         data: {
           encryptedAesKey: encryptedKey,
@@ -93,6 +95,7 @@ app.post(
         });
       }
     } catch (err) {
+      console.log(err);
       res.status(500).json({ error: "Upload failed" });
     }
   }
