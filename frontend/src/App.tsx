@@ -8,7 +8,7 @@ import {
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
-import { LandingPage } from "./pages/LandingPage";
+import { LandingPage } from "./pages/landlingPage/LandingPage";
 import { EncryptPage } from "./pages/EncryptPage";
 import { DecryptPage } from "./pages/DecryptPage";
 import { MyFilesPage } from "./pages/MyFilesPage";

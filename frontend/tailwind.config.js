@@ -1,7 +1,5 @@
-module.exports = {content: [
-  './index.html',
-  './src/**/*.{js,ts,jsx,tsx}'
-],
+module.exports = {
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   darkMode: "selector",
   theme: {
     container: {
@@ -73,4 +71,4 @@ module.exports = {content: [
       },
     },
   },
-}
+};
