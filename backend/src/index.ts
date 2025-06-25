@@ -29,6 +29,28 @@ app.use(helmet());
 app.use(morgan("dev"));
 // app.use(limiter);
 
+app.get("/api/file/:id", async (req: Request, res: Response) => {
+  const fileId = req.params.id;
+  console.log(fileId);
+  if (!fileId) {
+    res.status(400).json({ error: "File ID is required" });
+    return;
+  }
+  try {
+    const file = await prisma?.file.findUnique({
+      where: { id: parseInt(fileId) },
+    });
+    if (!file) {
+      res.status(404).json({ error: "File not found" });
+      return;
+    }
+    res.status(200).json(file);
+  } catch (error) {
+    console.error("Error fetching file:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 app.post(
   "/api/upload",
   upload.single("file"),
@@ -91,6 +113,10 @@ app.post(
             size: addFile.size,
             src: addFile.src,
             type: addFile.type,
+            iv: addFile.iv,
+            keyIv: addFile.keyIv,
+            salt: addFile.salt,
+            encryptedAesKey: addFile.encryptedAesKey,
           },
         });
       }

@@ -8,3 +8,8 @@ export const addFile = async (formData: FormData) => {
   });
   return response;
 };
+
+export const getFile = async (fileId: string) => {
+  const response = await axiosInstances.instance.get(`file/${fileId}`);
+  return response.data;
+};

@@ -1,10 +1,13 @@
 import React, { useCallback, useState } from "react";
 import { Upload, X, Lock, Copy, Download, Check } from "lucide-react";
 import { addFile } from "@/services/webApis/webApis";
+import { set } from "@cloudinary/url-gen/actions/variable";
+import { useNavigate } from "react-router-dom";
 
 type FileStatus = "idle" | "encrypting" | "uploading" | "complete" | "error";
 
 export function EncryptPage() {
+  const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -14,12 +17,38 @@ export function EncryptPage() {
   const [saveLater, setSaveLater] = useState(false);
   const [savePassword, setSavePassword] = useState("");
   const [copied, setCopied] = useState(false);
+
+  // const [uploadFileData, setUploadFileData] = useState<{
+  //   id: number;
+  //   name: string;
+  //   size: number;
+  //   src: string;
+  //   type: string;
+  //   iv: string;
+  //   keyIv: string;
+  //   salt: string;
+  //   encryptedAesKey: string;
+  // }>({
+  //   encryptedAesKey: "",
+  //   id: 0,
+  //   name: "",
+  //   size: 0,
+  //   src: "",
+  //   type: "",
+  //   iv: "",
+  //   keyIv: "",
+  //   salt: "",
+  // });
+
+  const [uploadedFileId, setUploadedFileId] = useState<number | null>(null);
+
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       setFile(e.dataTransfer.files[0]);
     }
   }, []);
+
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
   }, []);
@@ -32,11 +61,13 @@ export function EncryptPage() {
     },
     []
   );
+
   const handleClearFile = useCallback(() => {
     setFile(null);
     setStatus("idle");
     setProgress(0);
     setShareLink("");
+    setPassword("");
   }, []);
 
   const handleAddFile = async ({
@@ -57,10 +88,13 @@ export function EncryptPage() {
     fileSize: number;
   }) => {
     try {
-      alert("reached");
+      setStatus("uploading");
+      setProgress(75);
+
       const userId = 1;
       const formData = new FormData();
       formData.append("file", encryptedFile, fileName);
+      formData.append("fileName", fileName);
       formData.append("userId", userId.toString());
       formData.append("iv", btoa(String.fromCharCode(...iv)));
       formData.append("keyIv", btoa(String.fromCharCode(...keyIv)));
@@ -70,46 +104,67 @@ export function EncryptPage() {
         "encryptedKey",
         btoa(String.fromCharCode(...new Uint8Array(encryptedKey)))
       );
+
       const response = await addFile(formData);
+      setUploadedFileId(response.data.file.id);
       console.log("✅ File uploaded:", response);
+
+      setProgress(100);
+      setStatus("complete");
+      setShareLink(
+        `http://localhost:5173/decrypt/${btoa(
+          uploadedFileId?.toString() || ""
+        )}`
+      ); // fallback if response is dummy
+      alert("✅ File encrypted and uploaded successfully!");
     } catch (error) {
       console.error("❌ Failed to upload file:", error);
+      setStatus("error");
+      alert("❌ Upload failed. Please try again.");
     }
   };
 
   const handleEncrypt = useCallback(async () => {
-    if (!file) return;
-    setStatus("encrypting");
-    setProgress(0);
+    if (!file) {
+      alert("❗ No file selected.");
+      return;
+    }
+    if (!password) {
+      alert("❗ Password is required to encrypt the file.");
+      return;
+    }
 
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const aesKey = await crypto.subtle.generateKey(
-      {
-        name: "AES-GCM",
-        length: 256,
-      },
-      true,
-      ["encrypt", "decrypt"]
-    );
-    const fileSize = file.size;
-    const fileName = file.name;
+    try {
+      setStatus("encrypting");
+      setProgress(10);
 
-    const fileBuffer = await file.arrayBuffer();
-    setProgress(25);
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const aesKey = await crypto.subtle.generateKey(
+        {
+          name: "AES-GCM",
+          length: 256,
+        },
+        true,
+        ["encrypt", "decrypt"]
+      );
 
-    const encryptedFile = await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv },
-      aesKey,
-      fileBuffer
-    );
+      const fileSize = file.size;
+      const fileName = file.name;
+      const fileBuffer = await file.arrayBuffer();
+      setProgress(25);
 
-    const encryptedBlob = new Blob([encryptedFile]);
+      const encryptedFile = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv },
+        aesKey,
+        fileBuffer
+      );
+      const encryptedBlob = new Blob([encryptedFile]);
 
-    const rawAesKey = await crypto.subtle.exportKey("raw", aesKey);
-    let encryptedKey, keyIv, salt;
+      const rawAesKey = await crypto.subtle.exportKey("raw", aesKey);
+      setProgress(40);
 
-    if (password) {
-      salt = crypto.getRandomValues(new Uint8Array(16));
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+
       const enc = new TextEncoder();
       const keyMaterial = await crypto.subtle.importKey(
         "raw",
@@ -123,7 +178,7 @@ export function EncryptPage() {
         {
           name: "PBKDF2",
           salt,
-          iterations: 100_000,
+          iterations: 100000,
           hash: "SHA-256",
         },
         keyMaterial,
@@ -132,41 +187,48 @@ export function EncryptPage() {
         ["encrypt"]
       );
 
-      keyIv = crypto.getRandomValues(new Uint8Array(12));
-
-      encryptedKey = await crypto.subtle.encrypt(
+      setProgress(55);
+      const keyIv = crypto.getRandomValues(new Uint8Array(12));
+      const encryptedKey = await crypto.subtle.encrypt(
         { name: "AES-GCM", iv: keyIv },
         derivedKey,
         rawAesKey
       );
 
+      setProgress(70);
       await handleAddFile({
         encryptedFile: encryptedBlob,
-        iv: iv,
-        keyIv: keyIv,
-        encryptedKey: encryptedKey,
+        iv,
+        keyIv,
+        encryptedKey,
         fileName,
-        salt: salt,
+        salt,
         fileSize,
       });
+    } catch (error) {
+      console.error("❌ Encryption failed:", error);
+      setStatus("error");
+      alert("❌ Encryption failed. Please check the file and try again.");
     }
-  }, [file]);
+  }, [file, password]);
 
   const handleCopyLink = useCallback(() => {
     navigator.clipboard.writeText(shareLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+    alert("🔗 Link copied to clipboard!");
   }, [shareLink]);
+
   const handleSaveLater = useCallback(() => {
-    // Simulate saving the encryption key with password protection
     setTimeout(() => {
       setSaveLater(false);
       setSavePassword("");
-      alert(
-        "Encryption key secured with your password. You can share this file anytime later."
-      );
+      alert("🔐 Encryption key secured with your password.");
     }, 1000);
   }, [savePassword]);
+
+  const handleDownloadFile = () => {};
+
   return (
     <div className="container py-12 max-w-3xl">
       <div className="flex flex-col items-center justify-center mb-12">
@@ -272,7 +334,7 @@ export function EncryptPage() {
                     Anyone with the link can decrypt this file unless you've
                     protected it with a password.
                   </p>
-                  <div className="mt-4 pt-4 border-t">
+                  {/* <div className="mt-4 pt-4 border-t">
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-sm font-medium">
                         Want to share this file later?
@@ -311,7 +373,7 @@ export function EncryptPage() {
                         </button>
                       </div>
                     )}
-                  </div>
+                  </div> */}
                 </div>
               ) : null}
             </div>
@@ -362,11 +424,12 @@ export function EncryptPage() {
               Encrypt Another File
             </button>
             <button
-              onClick={() => alert("Downloading encryption key...")}
+              onClick={() => {
+                navigate(`/decrypt/${btoa(uploadedFileId?.toString() || "")}`);
+              }}
               className="px-4 py-2 bg-primary/10 text-primary rounded-md hover:bg-primary/20 transition-colors inline-flex items-center"
             >
-              <Download className="mr-2 h-4 w-4" />
-              Download Encryption Key
+              View File
             </button>
           </div>
         )}
