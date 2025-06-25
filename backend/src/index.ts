@@ -1,4 +1,4 @@
-import express, { Request, Response } from "express";
+import express, { NextFunction, Request, Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -6,6 +6,14 @@ import multer from "multer";
 import { UploadApiResponse } from "cloudinary";
 import { prisma } from "./lib/prisma";
 require("dotenv").config();
+
+declare global {
+  namespace Express {
+    interface Request {
+      userId: number;
+    }
+  }
+}
 
 const { v4: uuidv4 } = require("uuid");
 const cloudinary = require("cloudinary").v2;
@@ -28,6 +36,11 @@ app.use(cors());
 app.use(helmet());
 app.use(morgan("dev"));
 // app.use(limiter);
+
+const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  req.userId = 1;
+  next();
+};
 
 app.get("/api/file/:id", async (req: Request, res: Response) => {
   const fileId = req.params.id;
@@ -126,6 +139,30 @@ app.post(
     }
   }
 );
+
+app.get("/api/files", authMiddleware, async (req: Request, res: Response) => {
+  const userId = req.userId;
+  if (!userId) {
+    res.status(400).json({ error: "User ID is required" });
+    return;
+  }
+  const userIdExist = await prisma?.user.findUnique({
+    where: {
+      id: parseInt(userId.toString()),
+    },
+  });
+  if (!userIdExist) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  const files = await prisma?.file.findMany({
+    where: {
+      userId: parseInt(userId.toString()),
+    },
+  });
+
+  res.status(200).json(files || []);
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on port http://localhost:${PORT}`);

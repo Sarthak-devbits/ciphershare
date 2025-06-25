@@ -6,18 +6,20 @@ export function cn(...inputs: ClassValue[]) {
 
 export const uploadToCloudinary = async (blob: Blob) => {
   const formData = new FormData();
-  formData.append('file', blob);
-  formData.append('upload_preset', 'securevault_unsigned'); // use your actual preset name
+  formData.append("file", blob);
+  formData.append("upload_preset", "securevault_unsigned"); // use your actual preset name
 
-  const cloudRes = await fetch(`https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/auto/upload`, {
-    method: 'POST',
-    body: formData
-  });
+  const cloudRes = await fetch(
+    `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/auto/upload`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
 
   const cloudJson = await cloudRes.json();
   return cloudJson.secure_url; // or cloudJson.url if you prefer
 };
-
 
 export function base64ToUint8Array(base64: string): Uint8Array {
   const binary = atob(base64);
@@ -27,3 +29,7 @@ export function base64ToUint8Array(base64: string): Uint8Array {
   }
   return bytes;
 }
+
+export const getSharableFileLink = (fileId: number) => {
+  return `${process.env.REACT_APP_API_URL}/decrypt/${btoa(fileId.toString())}`;
+};

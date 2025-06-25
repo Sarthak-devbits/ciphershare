@@ -2,11 +2,11 @@ import React, { useCallback, useState } from "react";
 import { Upload, X, Lock, Copy, Download, Check } from "lucide-react";
 import { addFile } from "@/services/webApis/webApis";
 import { set } from "@cloudinary/url-gen/actions/variable";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 type FileStatus = "idle" | "encrypting" | "uploading" | "complete" | "error";
 
-export function EncryptPage() {
+export function EncryptPage({ isDropdown }: { isDropdown: boolean }) {
   const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
   const [password, setPassword] = useState("");
@@ -17,29 +17,6 @@ export function EncryptPage() {
   const [saveLater, setSaveLater] = useState(false);
   const [savePassword, setSavePassword] = useState("");
   const [copied, setCopied] = useState(false);
-
-  // const [uploadFileData, setUploadFileData] = useState<{
-  //   id: number;
-  //   name: string;
-  //   size: number;
-  //   src: string;
-  //   type: string;
-  //   iv: string;
-  //   keyIv: string;
-  //   salt: string;
-  //   encryptedAesKey: string;
-  // }>({
-  //   encryptedAesKey: "",
-  //   id: 0,
-  //   name: "",
-  //   size: 0,
-  //   src: "",
-  //   type: "",
-  //   iv: "",
-  //   keyIv: "",
-  //   salt: "",
-  // });
-
   const [uploadedFileId, setUploadedFileId] = useState<number | null>(null);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -89,13 +66,12 @@ export function EncryptPage() {
   }) => {
     try {
       setStatus("uploading");
-      setProgress(75);
-
-      const userId = 1;
+      // const id = isDropdown && userId ? atob(userId?.toString()) : 1;
+      const id = 1;
       const formData = new FormData();
       formData.append("file", encryptedFile, fileName);
       formData.append("fileName", fileName);
-      formData.append("userId", userId.toString());
+      formData.append("userId", id.toString());
       formData.append("iv", btoa(String.fromCharCode(...iv)));
       formData.append("keyIv", btoa(String.fromCharCode(...keyIv)));
       formData.append("salt", btoa(String.fromCharCode(...salt)));
@@ -104,19 +80,18 @@ export function EncryptPage() {
         "encryptedKey",
         btoa(String.fromCharCode(...new Uint8Array(encryptedKey)))
       );
-
+      setProgress(Math.random() * 75 + 25); // Randomize progress between 25 and 100
       const response = await addFile(formData);
       setUploadedFileId(response.data.file.id);
       console.log("✅ File uploaded:", response);
 
       setProgress(100);
       setStatus("complete");
-      setShareLink(
-        `http://localhost:5173/decrypt/${btoa(
-          uploadedFileId?.toString() || ""
-        )}`
-      ); // fallback if response is dummy
-      alert("✅ File encrypted and uploaded successfully!");
+      const linkToShare = `http://localhost:5173/decrypt/${btoa(
+        response.data.file.id?.toString() || ""
+      )}`;
+      console.log(linkToShare);
+      setShareLink(linkToShare); // fallback if response is dummy
     } catch (error) {
       console.error("❌ Failed to upload file:", error);
       setStatus("error");
@@ -233,11 +208,13 @@ export function EncryptPage() {
     <div className="container py-12 max-w-3xl">
       <div className="flex flex-col items-center justify-center mb-12">
         <h1 className="text-2xl md:text-3xl font-medium mb-4">
-          Encrypt Your Files
+          {isDropdown ? "Secure Drop Zone" : "Encrypt Your Files"}
         </h1>
         <p className="text-muted-foreground text-center max-w-md">
-          Files are encrypted in your browser before being uploaded. Only people
-          with the link can access them.
+          {isDropdown
+            ? "Drop a file to send securely. Only the recipient can decrypt it."
+            : `  Files are encrypted in your browser before being uploaded. Only people
+          with the link can access them.`}
         </p>
       </div>
       <div className="space-y-8">
@@ -308,88 +285,69 @@ export function EncryptPage() {
                   </div>
                 </div>
               ) : status === "complete" ? (
-                <div className="mt-2 p-4 bg-muted rounded-lg">
-                  <p className="text-sm font-medium mb-2">
-                    Secure Link Generated
-                  </p>
-                  <div className="flex">
-                    <input
-                      type="text"
-                      value={shareLink}
-                      readOnly
-                      className="flex-1 px-3 py-2 bg-background border rounded-l-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                    />
-                    <button
-                      onClick={handleCopyLink}
-                      className="px-3 py-2 bg-secondary hover:bg-secondary/80 rounded-r-md border-y border-r transition-colors"
-                    >
-                      {copied ? (
-                        <Check className="h-4 w-4" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </button>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Anyone with the link can decrypt this file unless you've
-                    protected it with a password.
-                  </p>
-                  {/* <div className="mt-4 pt-4 border-t">
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium">
-                        Want to share this file later?
-                      </label>
-                      <button
-                        className={`w-10 h-5 rounded-full p-0.5 ${
-                          saveLater ? "bg-primary" : "bg-muted-foreground/30"
-                        } transition-colors`}
-                        onClick={() => setSaveLater(!saveLater)}
-                      >
-                        <div
-                          className={`w-4 h-4 rounded-full bg-white transform transition-transform ${
-                            saveLater ? "translate-x-5" : "translate-x-0"
-                          }`}
-                        ></div>
-                      </button>
-                    </div>
-                    {saveLater && (
-                      <div className="mt-2 space-y-2">
-                        <div className="relative">
-                          <input
-                            type="password"
-                            value={savePassword}
-                            onChange={(e) => setSavePassword(e.target.value)}
-                            placeholder="Create a password to secure this file"
-                            className="w-full px-3 py-2 pr-10 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                          />
-                          <Lock className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <>
+                  <div className="mt-2 p-4 bg-muted rounded-lg border">
+                    {isDropdown ? (
+                      <>
+                        <div className=" inset-0 flex items-center justify-center z-50">
+                          <div className="  p-6 text-center space-y-2  max-w-sm w-full">
+                            <div className="text-4xl">📁✅</div>
+                            <p className="text-lg font-semibold">
+                              File dropped successfully!
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Your file is being securely uploaded and encrypted
+                              in your browser and user has been notified.
+                            </p>
+                          </div>
                         </div>
-                        <button
-                          onClick={handleSaveLater}
-                          disabled={!savePassword}
-                          className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Secure with Password
-                        </button>
+                      </>
+                    ) : (
+                      <div>
+                        <p className="text-sm font-medium mb-2">
+                          Secure Link Generated
+                        </p>
+                        <div className="flex">
+                          <input
+                            type="text"
+                            value={shareLink}
+                            readOnly
+                            className="flex-1 px-3 py-2 bg-background border rounded-l-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                          <button
+                            onClick={handleCopyLink}
+                            className="px-3 py-2 bg-secondary hover:bg-secondary/80 rounded-r-md border-y border-r transition-colors"
+                          >
+                            {copied ? (
+                              <Check className="h-4 w-4" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Anyone with the link can decrypt this file unless
+                          you've protected it with a password.
+                        </p>
                       </div>
                     )}
-                  </div> */}
-                </div>
+                  </div>
+                </>
               ) : null}
             </div>
           </div>
         )}
-        {/* Password Protection (before encryption) */}
+
         {file && status === "idle" && (
           <div className="border rounded-xl p-6 bg-card">
-            <h3 className="font-medium mb-4">Password Protection</h3>
+            <h3 className="font-medium mb-4">Password Protection*</h3>
             <div className="space-y-2">
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Optional: Add a password to protect your file"
+                  placeholder="Add a password to protect your file"
                   className="w-full px-3 py-2 pr-10 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                 />
                 <button
@@ -415,7 +373,7 @@ export function EncryptPage() {
             Encrypt and Upload
           </button>
         )}
-        {status === "complete" && (
+        {status === "complete" && !isDropdown && (
           <div className="flex justify-between">
             <button
               onClick={handleClearFile}

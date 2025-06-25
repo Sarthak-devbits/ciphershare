@@ -13,3 +13,8 @@ export const getFile = async (fileId: string) => {
   const response = await axiosInstances.instance.get(`file/${fileId}`);
   return response.data;
 };
+
+export const getAllFiles = async () => {
+  const response = await axiosInstances.instance.get(`files`);
+  return response.data;
+};
