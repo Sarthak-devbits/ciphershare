@@ -25,6 +25,7 @@ export function LandingPage() {
       {/* Security Section */}
       <SecuritySection />
       {/* CTA Section */}
+
       <CTAsection />
     </div>
   );

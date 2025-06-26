@@ -213,10 +213,19 @@ export function EncryptPage({ isDropdown }: { isDropdown: boolean }) {
         <p className="text-muted-foreground text-center max-w-md">
           {isDropdown
             ? "Drop a file to send securely. Only the recipient can decrypt it."
-            : `  Files are encrypted in your browser before being uploaded. Only people
-          with the link can access them.`}
+            : `Files are encrypted in your browser before being uploaded. Only people with the link can access them.`}
         </p>
+
+        {isDropdown && (
+          <div className="mt-4 text-center">
+            <p className="text-sm font-medium text-primary">👤 John Doe</p>
+            <p className="text-sm text-muted-foreground">
+              📧 johndoe@example.com
+            </p>
+          </div>
+        )}
       </div>
+
       <div className="space-y-8">
         {/* File Upload Area */}
         {status === "idle" || !file ? (

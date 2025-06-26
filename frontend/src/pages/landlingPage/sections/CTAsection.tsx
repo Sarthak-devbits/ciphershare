@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 export const CTAsection = () => {
   const navigate = useNavigate();
   return (
-    <section className="relative py-12 sm:py-16 lg:py-24 bg-primary overflow-hidden">
+    <section className="relative py-12 sm:pt-16 lg:py-24 bg-primary overflow-hidden">
       {/* Wave Background */}
       <div className="absolute inset-0 opacity-20">
         <svg

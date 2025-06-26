@@ -113,7 +113,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <main className="flex-1">{children}</main>
 
       {/* Footer */}
-      <footer className="border-t py-6 mt-12">
+      <footer className="border-t py-6">
         <div className="container flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground text-center sm:text-left">
           <p>© 2025 SecureVault. All rights reserved.</p>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
