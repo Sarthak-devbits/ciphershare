@@ -5,6 +5,7 @@ import morgan from "morgan";
 import multer from "multer";
 import { UploadApiResponse } from "cloudinary";
 import { prisma } from "./lib/prisma";
+
 require("dotenv").config();
 
 declare global {
@@ -69,13 +70,45 @@ app.post(
   upload.single("file"),
   async (req: Request, res: Response) => {
     try {
-      const { iv, encryptedKey, keyIv, salt, userId, fileSize } = req.body;
+      const {
+        iv,
+        encryptedKey,
+        keyIv,
+        salt,
+        userId,
+        fileSize,
+        externalUsername,
+        externalEmail,
+        expiry,
+      } = req.body;
 
-      const fileName = req.body.fileName || "defaultFileName";
       const fileBuffer = req.file?.buffer;
+      const fileName = req.body.fileName || "defaultFileName";
 
       if (!fileBuffer) {
         res.status(400).json({ error: "No file uploaded" });
+        return;
+      }
+
+      if (!iv || !encryptedKey || !keyIv || !salt || !userId) {
+        res.status(400).json({ error: "Missing required fields" });
+        return;
+      }
+
+      const expirationDate = expiry
+        ? new Date(expiry)
+        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // Default to 7 days
+
+      // Upsert external user if info is present
+      let externalUserId: number | null = null;
+
+      if (externalEmail && externalUsername) {
+        const externalUser = await prisma.externalUsers.upsert({
+          where: { email: externalEmail },
+          update: { name: externalUsername },
+          create: { name: externalUsername, email: externalEmail },
+        });
+        externalUserId = externalUser.id;
       }
 
       const uniqueFileName = uuidv4();
@@ -88,7 +121,7 @@ app.post(
                 resource_type: "raw",
                 public_id: `securevault/${uniqueFileName}`,
               },
-              (error: any, result: UploadApiResponse) => {
+              (error: any, result: any) => {
                 if (error) return reject(error);
                 resolve(result);
               }
@@ -96,52 +129,94 @@ app.post(
             .end(fileBuffer);
         }
       );
-      if (!uploadResult || !uploadResult.secure_url) {
-        res.status(500).json({ error: "Upload failed" });
+
+      if (!uploadResult?.secure_url) {
+        res.status(500).json({ error: "Cloudinary upload failed" });
         return;
       }
 
-      const addFile = await prisma?.file.create({
+      const fileRecord = await prisma.file.create({
         data: {
-          encryptedAesKey: encryptedKey,
-          iv: iv,
-          keyIv: keyIv,
-          salt: salt,
           name: fileName,
-          size: parseInt(fileSize, 10) || 0,
           src: uploadResult.secure_url,
+          size: parseInt(fileSize, 10) || 0,
           type: req.file?.mimetype || "application/octet-stream",
+          iv,
+          encryptedAesKey: encryptedKey,
+          keyIv,
+          salt,
           userId: parseInt(userId),
+          expiry: expirationDate,
+          externalUserId,
         },
       });
-      if (!addFile) {
-        res.status(500).json({ error: "Database operation failed" });
-        return;
-      } else {
-        res.status(200).json({
-          message: "File uploaded successfully",
-          file: {
-            id: addFile.id,
-            name: addFile.name,
-            size: addFile.size,
-            src: addFile.src,
-            type: addFile.type,
-            iv: addFile.iv,
-            keyIv: addFile.keyIv,
-            salt: addFile.salt,
-            encryptedAesKey: addFile.encryptedAesKey,
-          },
-        });
-      }
+
+      res.status(200).json({
+        message: "File uploaded successfully",
+        file: {
+          id: fileRecord.id,
+          name: fileRecord.name,
+          size: fileRecord.size,
+          src: fileRecord.src,
+          type: fileRecord.type,
+          iv: fileRecord.iv,
+          keyIv: fileRecord.keyIv,
+          salt: fileRecord.salt,
+          encryptedAesKey: fileRecord.encryptedAesKey,
+        },
+      });
+      return;
     } catch (err) {
-      console.log(err);
+      console.error("Upload failed:", err);
       res.status(500).json({ error: "Upload failed" });
+      return;
     }
   }
 );
 
+app.post("/download/count/:id", async (req: Request, res: Response) => {
+  const fileId = req.params.id;
+  if (!fileId) {
+    res.status(400).json({ error: "File ID is required" });
+    return;
+  }
+
+  const isFileExist = await prisma?.file.findUnique({
+    where: {
+      id: +fileId,
+    },
+  });
+
+  if (!isFileExist) {
+    res.status(404).json({ error: "File not found" });
+    return;
+  }
+
+  const updatedFileCount = await prisma?.file.update({
+    where: {
+      id: +fileId,
+    },
+    data: {
+      downloadCount: {
+        increment: 1,
+      },
+    },
+  });
+  if (!updatedFileCount) {
+    res.status(500).json({ error: "Failed to update download count" });
+    return;
+  }
+
+  res.status(200).json({
+    message: "Download count updated successfully",
+    fileData: updatedFileCount,
+  });
+  return;
+});
+
 app.get("/api/files", authMiddleware, async (req: Request, res: Response) => {
   const userId = req.userId;
+
   if (!userId) {
     res.status(400).json({ error: "User ID is required" });
     return;

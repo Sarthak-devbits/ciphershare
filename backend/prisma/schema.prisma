@@ -21,6 +21,9 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   files     file[]
+
+  @@index([id])
+  @@index([name])
 }
 
 model file {
@@ -33,8 +36,31 @@ model file {
   encryptedAesKey String
   keyIv           String
   salt            String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  userId          Int
-  user            User     @relation(fields: [userId], references: [id])
+  expiry          DateTime
+  downloadCount   Int      @default(0)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+
+  externalUserId Int?
+  externalUser   ExternalUsers? @relation(fields: [externalUserId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([id])
+  @@index([name])
+}
+
+model ExternalUsers {
+  id    Int     @id @default(autoincrement())
+  email String  @unique
+  name  String?
+  file  file[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([id])
+  @@index([name])
 }
