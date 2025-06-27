@@ -197,7 +197,7 @@ app.get(
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
       })
-      .redirect(`http://localhost:5173/`);
+      .redirect(process.env.CLIENT_URL as string);
     return;
   }
 );
