@@ -15,12 +15,12 @@ const Login = () => {
   };
   const handleGoogleLogin = async () => {
     try {
-      //   await loginWithGoogle()
-      navigate("/dashboard");
+      window.location.href = "http://localhost:3000/login/google"; // use your backend URL
     } catch (error) {
       console.error("Google login failed", error);
     }
   };
+
   return (
     <div className=" md:mt-0 md:min-h-[calc(100vh-64px)] bg-gray-50 flex flex-col-reverse md:flex-row">
       {/* Left side - Form */}
