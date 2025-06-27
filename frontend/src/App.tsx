@@ -12,6 +12,8 @@ import { LandingPage } from "./pages/landlingPage/LandingPage";
 import { EncryptPage } from "./pages/EncryptPage";
 import { DecryptPage } from "./pages/DecryptPage";
 import { MyFilesPage } from "./pages/myFiles/MyFilesPage";
+import Login from "./pages/auth/Login";
+import Signup from "./pages/auth/Signup";
 
 // Create a client
 const queryClient = new QueryClient();
@@ -23,6 +25,8 @@ export function App() {
         <Layout>
           <Routes>
             <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
             <Route path="/encrypt" element={<EncryptPage isDropdown={false}/>} />
             <Route path="/decrypt/:fileId" element={<DecryptPage />} />
             <Route path="/decrypt" element={<DecryptPage />} />
