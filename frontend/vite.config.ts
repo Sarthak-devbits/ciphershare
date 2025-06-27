@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   return {
     define: {
-      "process.env.REACT_APP_API_URL": JSON.stringify(env.REACT_APP_API_URL),
+      "process.env.SERVER_URL": JSON.stringify(env.SERVER_URL),
     },
     plugins: [react()],
     resolve: {
@@ -38,8 +38,8 @@ export default defineConfig(({ mode }) => {
 //       "process.env.REACT_APP_SHARE_SECRET_KEY": JSON.stringify(
 //         env.REACT_APP_SHARE_SECRET_KEY
 //       ),
-//       "process.env.REACT_APP_API_URL": JSON.stringify(
-//         env.REACT_APP_API_URL
+//       "process.env.SERVER_URL": JSON.stringify(
+//         env.SERVER_URL
 //       ),
 //       "process.env.CDN_BASE": JSON.stringify(
 //         env.CDN_BASE

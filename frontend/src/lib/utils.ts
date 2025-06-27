@@ -31,5 +31,5 @@ export function base64ToUint8Array(base64: string): Uint8Array {
 }
 
 export const getSharableFileLink = (fileId: number) => {
-  return `${process.env.REACT_APP_API_URL}/decrypt/${btoa(fileId.toString())}`;
+  return `${process.env.SERVER_URL}/decrypt/${btoa(fileId.toString())}`;
 };
