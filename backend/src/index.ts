@@ -7,7 +7,8 @@ import { UploadApiResponse } from "cloudinary";
 import { prisma } from "./lib/prisma";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { authorization } from "./middleware/authorization.middleware";
-import passport from "passport";
+import passport from "./config/passport";
+
 const cookieParse = require("cookie-parser");
 const bcrypt = require("bcryptjs");
 
@@ -167,9 +168,39 @@ app.get(
 app.get(
   "/googleRedirect",
   passport.authenticate("google", { session: false }),
-  (req: Request, res: Response) => {}
-);
+  async (req: Request, res: Response) => {
+    const emailId = (req.user as any).emails[0].value;
 
+    const isUserExist = await prisma?.user.findUnique({
+      where: {
+        email: emailId,
+      },
+    });
+
+    if (!isUserExist) {
+      const user = await prisma?.user.create({
+        data: {
+          email: emailId,
+          password: "",
+          name: (req.user as any).displayName || "Google User",
+        },
+      });
+    }
+
+    const token = jwt.sign(
+      { id: (req.user as any).id, email: emailId },
+      process.env.JWT_SECERT as string
+    );
+
+    res
+      .cookie("access_token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+      })
+      .redirect(`http://localhost:5173/`);
+    return;
+  }
+);
 
 app.get("/protected", authorization, (req: Request, res: Response) => {
   res.json({ user: { id: req.userId, role: req.email } });
