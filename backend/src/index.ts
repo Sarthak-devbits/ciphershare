@@ -5,6 +5,11 @@ import morgan from "morgan";
 import multer from "multer";
 import { UploadApiResponse } from "cloudinary";
 import { prisma } from "./lib/prisma";
+import jwt, { JwtPayload } from "jsonwebtoken";
+import { authorization } from "./middleware/authorization.middleware";
+import passport from "passport";
+const cookieParse = require("cookie-parser");
+const bcrypt = require("bcryptjs");
 
 require("dotenv").config();
 
@@ -12,6 +17,7 @@ declare global {
   namespace Express {
     interface Request {
       userId: number;
+      email: string;
     }
   }
 }
@@ -36,12 +42,139 @@ app.use(express.json());
 app.use(cors());
 app.use(helmet());
 app.use(morgan("dev"));
+app.use(cookieParse());
+
 // app.use(limiter);
 
-const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  req.userId = 1;
-  next();
-};
+//Middleware to check authorization
+
+//Authentication
+app.post("/login", async (req: Request, res: Response) => {
+  if (!req.body) {
+    res.status(400).json({ error: "Request body is required" });
+    return;
+  }
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    res.status(400).json({ error: "Email and password are required" });
+    return;
+  }
+
+  const isUserExist = await prisma?.user.findUnique({
+    where: {
+      email: email,
+    },
+  });
+
+  if (!isUserExist) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  const isPasswordMatch = await bcrypt.compare(password, isUserExist.password);
+
+  if (!isPasswordMatch) {
+    res.status(401).json({ error: "Invalid password" });
+    return;
+  }
+
+  const token = jwt.sign(
+    { id: isUserExist.id, email: isUserExist.email },
+    process.env.JWT_SECERT as string
+  );
+
+  res
+    .cookie("access_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+    })
+    .status(200)
+    .json({
+      message: "Login successful",
+      user: {
+        id: isUserExist.id,
+        email: isUserExist.email,
+      },
+    });
+  return;
+});
+
+app.post("/signup", async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    res.status(400).json({ error: "Email and password are required" });
+    return;
+  }
+
+  const isUserExist = await prisma?.user.findUnique({
+    where: {
+      email: email,
+    },
+  });
+  if (isUserExist) {
+    res.status(409).json({ error: "User already exists" });
+    return;
+  }
+
+  const salt = await bcrypt.genSalt(10);
+  const hashPassword = await bcrypt.hash(password, salt);
+
+  const user = await prisma?.user.create({
+    data: {
+      email: email,
+      password: hashPassword,
+    },
+  });
+
+  const token = await jwt.sign(
+    { id: user.id, email: user.email },
+    process.env.JWT_SECERT as string
+  );
+
+  res
+    .cookie("access_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+    })
+    .status(200)
+    .json({
+      message: "Signup successful",
+      user: {
+        id: user.id,
+        email: user.email,
+      },
+    });
+});
+
+app.get("logout", (req: Request, res: Response) => {
+  res
+    .clearCookie("access_token")
+    .status(200)
+    .json({ message: "Logout successful" });
+});
+
+// Google Authentication
+app.get(
+  "/login/google",
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+    session: false,
+  })
+);
+
+app.get(
+  "/googleRedirect",
+  passport.authenticate("google", { session: false }),
+  (req: Request, res: Response) => {}
+);
+
+
+app.get("/protected", authorization, (req: Request, res: Response) => {
+  res.json({ user: { id: req.userId, role: req.email } });
+  return;
+});
 
 app.get("/api/file/:id", async (req: Request, res: Response) => {
   const fileId = req.params.id;
@@ -214,7 +347,7 @@ app.post("/download/count/:id", async (req: Request, res: Response) => {
   return;
 });
 
-app.get("/api/files", authMiddleware, async (req: Request, res: Response) => {
+app.get("/api/files", async (req: Request, res: Response) => {
   const userId = req.userId;
 
   if (!userId) {
